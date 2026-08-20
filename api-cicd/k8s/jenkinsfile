@@ -2,177 +2,34 @@ pipeline {
 
     agent any
 
-    parameters {
-
-        choice(
-            name: 'SERVICE',
-            choices: [
-                'user-api',
-                'order-api',
-                'payment-api'
-            ],
-            description: 'Select the API to deploy'
-        )
-
-        string(
-            name: 'IMAGE_TAG',
-            defaultValue: 'v1.0.0',
-            description: 'Docker image tag to deploy'
-        )
-    }
-
-    environment {
-
-        REGISTRY = 'ghcr.io/sachinsingh2468'
-
-        KUBECONFIG = credentials('kubeconfig-prod')
-    }
-
     stages {
 
-        stage('Validate') {
+        stage('Kubernetes Connection Test') {
+
             steps {
-                script {
 
-                    if (!params.IMAGE_TAG.matches('^v[0-9]+\\.[0-9]+\\.[0-9]+$')) {
-                        error "Invalid tag: ${params.IMAGE_TAG}. Expected format: v1.2.0"
-                    }
+                withCredentials([
+		    file(
+			credentialsId: '835cf3c0-0c93-41a3-890e-7ee0b50db384',
+                        variable: 'KUBECONFIG'
+                    )
+                ]) {
 
-                    echo "================================"
-                    echo "Service : ${params.SERVICE}"
-                    echo "Tag     : ${params.IMAGE_TAG}"
-                    echo "Image   : ${REGISTRY}/${params.SERVICE}:${params.IMAGE_TAG}"
-                    echo "================================"
+                    sh '''
+                        echo "Testing Jenkins -> Kubernetes connection..."
+
+                        kubectl --kubeconfig="$KUBECONFIG" get nodes
+
+                        echo "Testing namespace access..."
+
+                        kubectl --kubeconfig="$KUBECONFIG" get deployments -n apis
+
+                        echo "Testing deployment permission..."
+
+                        kubectl --kubeconfig="$KUBECONFIG" auth can-i update deployments -n apis
+                    '''
                 }
             }
-        }
-
-
-        stage('Helm Lint') {
-            steps {
-
-                sh '''
-                    helm lint ./helm/api
-                '''
-            }
-        }
-
-
-        stage('Capture Current Revision') {
-            steps {
-
-                script {
-
-                    env.PREVIOUS_REVISION = sh(
-                        script: """
-                            helm history ${SERVICE} \
-                            --namespace apis \
-                            --kubeconfig=${KUBECONFIG} \
-                            --max 10 \
-                            -o json | \
-                            jq -r '[.[] | select(.status == "deployed")][0].revision // "0"'
-                        """,
-                        returnStdout: true
-                    ).trim()
-
-                    echo "Previous deployed revision: ${env.PREVIOUS_REVISION}"
-                }
-            }
-        }
-
-
-        stage('Approval') {
-            steps {
-
-                input(
-                    message: """
-                    Deploy ${SERVICE}:${IMAGE_TAG}?
-
-                    Image:
-                    ${REGISTRY}/${SERVICE}:${IMAGE_TAG}
-
-                    Namespace:
-                    apis
-                    """,
-                    ok: 'Deploy'
-                )
-            }
-        }
-
-
-        stage('Deploy') {
-            steps {
-
-                sh """
-                    helm upgrade --install ${SERVICE} \
-                    ./helm/api \
-                    --namespace apis \
-                    --create-namespace \
-                    --kubeconfig=${KUBECONFIG} \
-                    --set image.repository=${REGISTRY}/${SERVICE} \
-                    --set image.tag=${IMAGE_TAG} \
-                    --wait \
-                    --timeout 5m
-                """
-            }
-        }
-
-
-        stage('Health Check') {
-            steps {
-
-                sh """
-                    kubectl \
-                    --kubeconfig=${KUBECONFIG} \
-                    rollout status \
-                    deployment/${SERVICE} \
-                    -n apis \
-                    --timeout=180s
-                """
-            }
-        }
-    }
-
-
-    post {
-
-        failure {
-
-            script {
-
-                echo "======================================"
-                echo "Deployment failed."
-                echo "Starting automatic rollback..."
-                echo "======================================"
-
-                if (env.PREVIOUS_REVISION &&
-                    env.PREVIOUS_REVISION != "0") {
-
-                    sh """
-                        helm rollback ${SERVICE} \
-                        ${PREVIOUS_REVISION} \
-                        --namespace apis \
-                        --kubeconfig=${KUBECONFIG} \
-                        --wait \
-                        --timeout 5m
-                    """
-
-                    echo "Rollback completed."
-                }
-                else {
-
-                    echo "No previous deployed revision found."
-                }
-            }
-        }
-
-        success {
-
-            echo "======================================"
-            echo "Deployment successful"
-            echo "Service : ${SERVICE}"
-            echo "Tag     : ${IMAGE_TAG}"
-            echo "======================================"
         }
     }
 }
