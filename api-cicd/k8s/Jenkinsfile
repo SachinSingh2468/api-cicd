@@ -8,9 +8,8 @@ pipeline {
 
             steps {
 
-                withCredentials([
-		    file(
-			credentialsId: '835cf3c0-0c93-41a3-890e-7ee0b50db384',
+                withCredentials([file(
+			credentialsId: 'kubeconfig-prod',
                         variable: 'KUBECONFIG'
                     )
                 ]) {
