@@ -17,8 +17,6 @@ pipeline {
                     sh '''
                         echo "Testing Jenkins -> Kubernetes connection..."
 
-                        kubectl --kubeconfig="$KUBECONFIG" get nodes
-
                         echo "Testing namespace access..."
 
                         kubectl --kubeconfig="$KUBECONFIG" get deployments -n apis
