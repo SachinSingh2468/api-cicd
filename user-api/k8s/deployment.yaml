@@ -1,0 +1,51 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: user-api
+  namespace: apis
+
+spec:
+    replicas: 3
+    selector:
+      matchLabels:
+        app: user-api
+
+    template:
+      metadata:
+        labels:
+          app: user-api
+
+      spec:
+        imagePullSecrets:
+          - name: ghcr-secret
+        containers:
+          - name: user-api
+            image: ghcr.io/sachinsingh2468/user-api:v1.0.0
+            ports:
+              - containerPort: 8000
+            imagePullPolicy: IfNotPresent
+            readinessProbe:
+              httpGet:
+                path: /health
+                port: 8000
+              initialDelaySeconds: 5
+              periodSeconds: 10
+
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 8000
+              initialDelaySeconds: 10
+              periodSeconds: 20
+
+            resources:
+              requests:
+                cpu: "100m"
+                memory: "120Mi"
+
+              limits:
+                cpu: "500m"
+                memory: "512Mi"
+
+
+

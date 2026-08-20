@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payment-api
+  namespace: apis
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: payment-api
+
+  template:
+    metadata:
+      labels:
+        app: payment-api
+
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret
+      containers:
+        - name: payment-api
+          image: ghcr.io/sachinsingh2468/payment-api:v1.0.0
+          ports:
+            - containerPort: 8000
+          imagePullPolicy: IfNotPresent
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 20
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "120Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

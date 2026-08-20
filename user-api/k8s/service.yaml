@@ -1,0 +1,15 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: user-api
+  namespace: apis
+
+spec:
+  selector:
+    app: user-api
+
+  ports:
+    - port: 80
+      targetPort: 8000
+
+  type: ClusterIP
